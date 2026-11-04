@@ -251,6 +251,17 @@ EOF
         extra_mod_args+=(
             -DUSE_BreezeIcons=OFF
         )
+    elif [[ "${PKG_NAME}" == "breeze-icons" ]]; then
+        extra_mod_args+=(
+            -DWITH_ICON_GENERATION=OFF
+            -DBINARY_ICONS_RESOURCE=OFF
+            -DINSTALL_HOST_TOOLS=ON
+        )
+        if [[ "${arch}" == "arm64" ]]; then
+            extra_mod_args+=(
+                -DKF6_HOST_TOOLING="/opt/pacman/bin"
+            )
+        fi
     elif [[ "${PKG_NAME}" == "ktextwidgets" ]]; then
         extra_mod_args+=(
             -DWITH_TEXT_TO_SPEECH=OFF
@@ -329,6 +340,19 @@ EOF
     if [[ -d "${SRC_EXTRACT_DIR}/${PKG_NAME}-${PKG_VER}/LICENSES" ]]; then
         mkdir -p "${stage_dir}/opt/pacman/share/licenses/${PKG_NAME}"
         cp -a "${SRC_EXTRACT_DIR}/${PKG_NAME}-${PKG_VER}/LICENSES/"* "${stage_dir}/opt/pacman/share/licenses/${PKG_NAME}/" 2>/dev/null || true
+    fi
+
+    # Create /opt/pacman/bin/<app> symlinks for any macOS .app bundles in /opt/pacman/Applications/KDE
+    if [[ -d "${stage_dir}/opt/pacman/Applications/KDE" ]]; then
+        mkdir -p "${stage_dir}/opt/pacman/bin"
+        for app_bundle in "${stage_dir}/opt/pacman/Applications/KDE/"*.app; do
+            [[ -d "${app_bundle}" ]] || continue
+            local app_name
+            app_name="$(basename "${app_bundle}" .app)"
+            if [[ -x "${app_bundle}/Contents/MacOS/${app_name}" && ! -e "${stage_dir}/opt/pacman/bin/${app_name}" ]]; then
+                ln -s "../Applications/KDE/${app_name}.app/Contents/MacOS/${app_name}" "${stage_dir}/opt/pacman/bin/${app_name}"
+            fi
+        done
     fi
 
     find "${stage_dir}" -name ".DS_Store" -delete 2>/dev/null || true
