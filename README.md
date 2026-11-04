@@ -49,6 +49,8 @@ kf6_darwin/
 ```bash
 # Build, audit, and package any module for both architectures:
 ./scripts/build-module.sh <module> all
+# Build, audit, package, and install any module for both architectures:
+./scripts/build-module.sh <module> --arch both --install
 
 # Audit a built Pacman archive:
 ./scripts/audit-package.sh out/darwin_x86_64/<pkg>.pkg.tar.zst darwin_x86_64

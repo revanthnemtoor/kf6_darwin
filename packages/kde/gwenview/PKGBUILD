@@ -54,6 +54,18 @@ package() {
     install -dm755 "${pkgdir}/opt/pacman/share/licenses/${pkgname}"
     cp -a "${pkgname}-${pkgver}/LICENSES/"* "${pkgdir}/opt/pacman/share/licenses/${pkgname}/"
 
+    if [[ -d "${pkgdir}/opt/pacman/Applications/KDE" ]]; then
+        install -dm755 "${pkgdir}/opt/pacman/bin"
+        for app_bundle in "${pkgdir}/opt/pacman/Applications/KDE/"*.app; do
+            [[ -d "${app_bundle}" ]] || continue
+            local app_name
+            app_name="$(basename "${app_bundle}" .app)"
+            if [[ -x "${app_bundle}/Contents/MacOS/${app_name}" && ! -e "${pkgdir}/opt/pacman/bin/${app_name}" ]]; then
+                ln -s "../Applications/KDE/${app_name}.app/Contents/MacOS/${app_name}" "${pkgdir}/opt/pacman/bin/${app_name}"
+            fi
+        done
+    fi
+
     find "${pkgdir}/opt/pacman" -type f -print0 | while IFS= read -r -d '' f; do
         if file -b "$f" | grep -qE "Mach-O.*(executable|dynamically linked shared library|bundle)"; then
             codesign --sign - --force "$f" 2>/dev/null || true
