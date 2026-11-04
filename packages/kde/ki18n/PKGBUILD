@@ -1,0 +1,56 @@
+# Maintainer: Revanth Reddy Nemtoor <revanthreddyn123@gmail.com>
+pkgname=ki18n
+pkgver=6.31.0
+pkgrel=1
+pkgdesc="Advanced internationalization framework (KDE Frameworks 6 for Darwin)"
+arch=('darwin_x86_64' 'darwin_arm64')
+url="https://invent.kde.org/frameworks/ki18n"
+license=('LGPL-2.0-or-later' 'LGPL-2.1-or-later')
+depends=('qt6-base' 'qt6-declarative' 'gettext')
+makedepends=('extra-cmake-modules' 'qt6-tools' 'cmake' 'ninja')
+options=('!strip')
+_commit="df98b98f001721f83ebf3e36b73e346f6d29670a" # refs/tags/v6.31.0^{}
+source=("https://download.kde.org/stable/frameworks/${pkgver%.*}/${pkgname}-${pkgver}.tar.xz")
+sha256sums=('9fa271c7a33b856451de1ed3ff105626c2763fbd3b11d3210b02cb30de43f2ba')
+sha512sums=('80c1e249cc0dd1cc694df21a3039c21287a620d26c4829978da4bc57ca58d80bc97a4d2384dda44cfbae47f204c46cdc07bbd48fd8facc58aa24656f0b650e1f')
+
+build() {
+  local _arch
+  case "${CARCH:-$(uname -m)}" in
+    x86_64|darwin_x86_64) _arch="x86_64" ;;
+    arm64|darwin_arm64)   _arch="arm64" ;;
+    *)                    _arch="$(uname -m)" ;;
+  esac
+
+  export LC_ALL=en_US.UTF-8
+  export PKG_CONFIG_PATH="/opt/pacman/lib/pkgconfig"
+  export PATH="/opt/pacman/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/local/bin:/usr/local/bin"
+
+  cmake -B build -S "${pkgname}-${pkgver}" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/opt/pacman \
+    -DKDE_INSTALL_BUNDLEDIR=/opt/pacman/Applications/KDE \
+    -DAPPLE_SUPPRESS_X11_WARNING=ON \
+    -DPython3_EXECUTABLE=/usr/bin/python3 \
+    -DCMAKE_OSX_ARCHITECTURES="${_arch}" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+    -DCMAKE_PREFIX_PATH=/opt/pacman \
+    -DCMAKE_IGNORE_PREFIX_PATH="/opt/local;/usr/local;/opt/homebrew" \
+    -DCMAKE_INSTALL_RPATH="/opt/pacman/lib" \
+    -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+    -DBUILD_TESTING=OFF
+
+  cmake --build build --parallel
+}
+
+package() {
+  DESTDIR="${pkgdir}" cmake --install build
+
+  if [[ -d "${pkgname}-${pkgver}/LICENSES" ]]; then
+    install -d "${pkgdir}/opt/pacman/share/licenses/${pkgname}"
+    cp -a "${pkgname}-${pkgver}/LICENSES/"* "${pkgdir}/opt/pacman/share/licenses/${pkgname}/"
+  fi
+
+  find "${pkgdir}" -name ".DS_Store" -delete 2>/dev/null || true
+}
+

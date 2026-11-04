@@ -1,0 +1,56 @@
+# Maintainer: kf6_darwin Maintainers <maintainers@kf6-darwin.local>
+# Upstream: https://invent.kde.org/frameworks/kjobwidgets
+
+pkgname=kjobwidgets
+pkgver=6.31.0
+pkgrel=1
+pkgdesc='Widgets for tracking KJob instances'
+arch=('darwin_x86_64' 'darwin_arm64')
+url='https://community.kde.org/Frameworks'
+license=('LGPL-2.0-only' 'LGPL-3.0-only')
+groups=('kf6')
+depends=('qt6-base' 'kcoreaddons' 'knotifications' 'kwidgetsaddons')
+makedepends=('extra-cmake-modules' 'qt6-tools')
+_commit='70d855f13040f1ee64002392629a7ac070a9798d'
+source=("https://download.kde.org/stable/frameworks/${pkgver%.*}/${pkgname}-${pkgver}.tar.xz")
+sha256sums=('b734186ed41e8cc84c2a5f9ba61b46075dacf076450dcb78d37a5d01dcd8c69e')
+sha512sums=('d07ea5749f529defab8acd8d4ec5d1eb29f1700e97b484c01f06b964aac045ad17c3f82f507ce2087d848f4182ce4c6afae08166055accbe3675e465e6df6993')
+
+build() {
+    export LC_ALL=en_US.UTF-8
+    export PATH="/opt/pacman/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/local/bin:/usr/local/bin"
+
+    local target_arch="${CARCH#darwin_}"
+    [[ -z "${target_arch}" || "${target_arch}" == "${CARCH}" ]] && target_arch="$(uname -m)"
+
+    cmake -B build -S "${pkgname}-${pkgver}" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="/opt/pacman" \
+        -DKDE_INSTALL_BUNDLEDIR="/opt/pacman/Applications/KDE" \
+        -DAPPLE_SUPPRESS_X11_WARNING=ON \
+        -DPython3_EXECUTABLE="/usr/bin/python3" \
+        -DCMAKE_IGNORE_PREFIX_PATH="/opt/local;/usr/local;/opt/homebrew" \
+        -DCMAKE_PREFIX_PATH="/opt/pacman" \
+        -DCMAKE_OSX_ARCHITECTURES="${target_arch}" \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET="15.0" \
+        -DCMAKE_INSTALL_RPATH="/opt/pacman/lib" \
+        -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+        -DBUILD_PYTHON_BINDINGS=OFF \
+        -DBUILD_TESTING=OFF
+
+    cmake --build build
+}
+
+package() {
+    DESTDIR="${pkgdir}" cmake --install build
+
+    install -dm755 "${pkgdir}/opt/pacman/share/licenses/${pkgname}"
+    cp -a "${pkgname}-${pkgver}/LICENSES/"* "${pkgdir}/opt/pacman/share/licenses/${pkgname}/"
+
+    find "${pkgdir}/opt/pacman" -type f -print0 | while IFS= read -r -d '' f; do
+        if file -b "$f" | grep -qE "Mach-O.*(executable|dynamically linked shared library|bundle)"; then
+            codesign --sign - --force "$f" 2>/dev/null || true
+        fi
+    done
+}
+

@@ -1,0 +1,63 @@
+# Maintainer: kf6_darwin Maintainers <maintainers@kf6-darwin.local>
+# Upstream: https://invent.kde.org/graphics/gwenview
+
+pkgname=gwenview
+pkgver=26.08.2
+pkgrel=1
+pkgdesc='Fast and easy to use image viewer by KDE'
+arch=('darwin_x86_64' 'darwin_arm64')
+url='https://apps.kde.org/gwenview/'
+license=('GPL-2.0-or-later')
+groups=('kde-applications' 'kde-graphics')
+depends=('qt6-base' 'qt6-multimedia' 'qt6-svg' 'kio' 'kitemmodels' 'ki18n' 'kparts' 'kwindowsystem' 'kiconthemes' 'knotifications' 'kguiaddons' 'kwidgetsaddons' 'kcrash' 'libjpeg-turbo' 'libpng' 'libtiff' 'lcms2' 'exiv2')
+makedepends=('extra-cmake-modules' 'qt6-tools')
+_commit='8b0e102721811a171ccee23ddfb86d0dd8302012'
+source=("https://download.kde.org/stable/release-service/${pkgver}/src/${pkgname}-${pkgver}.tar.xz")
+sha256sums=('bc6eb96196daeb5879e3551b834e65e296409d2252804ee26fedcbb376826a72')
+sha512sums=('9451c6056abf4691e871d1125dff4b4fd925206378a70e8456aec05bb5c4f1657bbfa9f92fb4584ffb9f41a9a3ff212db2766cea1d3725ad5227f2aa4543db58')
+
+prepare() {
+    cd "${pkgname}-${pkgver}"
+    patch -Np1 -i "${srcdir}/../../../patches/gwenview/0001-macos-bundle-plist.patch"
+}
+
+build() {
+    export LC_ALL=en_US.UTF-8
+    export PATH="/opt/pacman/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/local/bin:/usr/local/bin"
+
+    local target_arch="${CARCH#darwin_}"
+    [[ -z "${target_arch}" || "${target_arch}" == "${CARCH}" ]] && target_arch="$(uname -m)"
+
+    cmake -B build -S "${pkgname}-${pkgver}" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="/opt/pacman" \
+        -DKDE_INSTALL_BUNDLEDIR="/opt/pacman/Applications/KDE" \
+        -DAPPLE_SUPPRESS_X11_WARNING=ON \
+        -DPython3_EXECUTABLE="/usr/bin/python3" \
+        -DCMAKE_IGNORE_PREFIX_PATH="/opt/local;/usr/local;/opt/homebrew" \
+        -DCMAKE_PREFIX_PATH="/opt/pacman" \
+        -DCMAKE_OSX_ARCHITECTURES="${target_arch}" \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET="15.0" \
+        -DCMAKE_INSTALL_RPATH="/opt/pacman/lib" \
+        -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+        -DGWENVIEW_SEMANTICINFO_BACKEND="None" \
+        -DGWENVIEW_IMAGEANNOTATOR=OFF \
+        -DWITHOUT_X11=ON \
+        -DBUILD_TESTING=OFF
+
+    cmake --build build
+}
+
+package() {
+    DESTDIR="${pkgdir}" cmake --install build
+
+    install -dm755 "${pkgdir}/opt/pacman/share/licenses/${pkgname}"
+    cp -a "${pkgname}-${pkgver}/LICENSES/"* "${pkgdir}/opt/pacman/share/licenses/${pkgname}/"
+
+    find "${pkgdir}/opt/pacman" -type f -print0 | while IFS= read -r -d '' f; do
+        if file -b "$f" | grep -qE "Mach-O.*(executable|dynamically linked shared library|bundle)"; then
+            codesign --sign - --force "$f" 2>/dev/null || true
+        fi
+    done
+}
+

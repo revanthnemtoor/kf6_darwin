@@ -1,0 +1,55 @@
+# Maintainer: kf6_darwin Maintainers <maintainers@kf6-darwin.local>
+# Upstream: https://github.com/libjpeg-turbo/libjpeg-turbo
+
+pkgname=libjpeg-turbo
+pkgver=3.2.1
+pkgrel=1
+pkgdesc='JPEG image codec with accelerated baseline compression and decompression'
+arch=('darwin_x86_64' 'darwin_arm64')
+url='https://libjpeg-turbo.org/'
+license=('BSD-3-Clause' 'IJG')
+depends=()
+makedepends=()
+_commit='7b4993786d856cbccabfc0ed2f923ba000e326cc'
+source=("https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/${pkgver}/${pkgname}-${pkgver}.tar.gz")
+sha256sums=('c27ad72a68da151177929aa969ae773a2da5ac2af9ce946079314fdac8cece7f')
+sha512sums=('8a0be9e42f4dd0634d61ec76b959f8942c70237848bb2854baad8abd352483784b7c4f099823368fb3e40be5d9200fb4b2574aecdcebf225d74b09dc217948eb')
+
+build() {
+    export LC_ALL=en_US.UTF-8
+    export PATH="/opt/pacman/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/local/bin:/usr/local/bin"
+
+    local target_arch="${CARCH#darwin_}"
+    [[ -z "${target_arch}" || "${target_arch}" == "${CARCH}" ]] && target_arch="$(uname -m)"
+
+    cmake -B build -S "${pkgname}-${pkgver}" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="/opt/pacman" \
+        -DCMAKE_INSTALL_NAME_DIR="/opt/pacman/lib" \
+        -DCMAKE_ASM_NASM_COMPILER="/usr/local/bin/nasm" \
+        -DCMAKE_IGNORE_PREFIX_PATH="/opt/local;/usr/local;/opt/homebrew" \
+        -DCMAKE_PREFIX_PATH="/opt/pacman" \
+        -DCMAKE_OSX_ARCHITECTURES="${target_arch}" \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET="15.0" \
+        -DCMAKE_INSTALL_RPATH="/opt/pacman/lib" \
+        -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+        -DENABLE_SHARED=ON \
+        -DENABLE_STATIC=OFF \
+        -DWITH_JPEG8=ON
+
+    cmake --build build
+}
+
+package() {
+    DESTDIR="${pkgdir}" cmake --install build
+
+    install -dm755 "${pkgdir}/opt/pacman/share/licenses/${pkgname}"
+    cp -a "${pkgname}-${pkgver}/LICENSE.md" "${pkgdir}/opt/pacman/share/licenses/${pkgname}/"
+
+    find "${pkgdir}/opt/pacman" -type f -print0 | while IFS= read -r -d '' f; do
+        if file -b "$f" | grep -qE "Mach-O.*(executable|dynamically linked shared library|bundle)"; then
+            codesign --sign - --force "$f" 2>/dev/null || true
+        fi
+    done
+}
+

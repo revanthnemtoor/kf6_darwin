@@ -1,0 +1,58 @@
+# Maintainer: kf6_darwin Maintainers <maintainers@kf6-darwin.local>
+# Upstream: https://github.com/Exiv2/exiv2
+
+pkgname=exiv2
+pkgver=0.28.9
+pkgrel=1
+pkgdesc='Exif, Iptc and XMP metadata manipulation library and tools'
+arch=('darwin_x86_64' 'darwin_arm64')
+url='https://exiv2.org/'
+license=('GPL-2.0-or-later')
+depends=('expat' 'zlib')
+makedepends=()
+_commit='b0859fc61fea5dedfc898aece6b15893ddf4314e'
+source=("https://github.com/Exiv2/exiv2/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=('700b76b97695b2fab4ef8c79619c68ae57d09e0c130724791cafbd39e0eb4aef')
+sha512sums=('a7fa8fb19e54cdf0b9aac917087c86d45ea1b4a991a85ea8c5dd96af0289df63823901e44604d4c8df55883dcd19aee2efc48d7b5fde313dc0787b842a223a4a')
+
+build() {
+    export LC_ALL=en_US.UTF-8
+    export PATH="/opt/pacman/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/local/bin:/usr/local/bin"
+
+    local target_arch="${CARCH#darwin_}"
+    [[ -z "${target_arch}" || "${target_arch}" == "${CARCH}" ]] && target_arch="$(uname -m)"
+
+    cmake -B build -S "${pkgname}-${pkgver}" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="/opt/pacman" \
+        -DCMAKE_INSTALL_NAME_DIR="/opt/pacman/lib" \
+        -DCMAKE_IGNORE_PREFIX_PATH="/opt/local;/usr/local;/opt/homebrew" \
+        -DCMAKE_PREFIX_PATH="/opt/pacman" \
+        -DCMAKE_OSX_ARCHITECTURES="${target_arch}" \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET="15.0" \
+        -DCMAKE_INSTALL_RPATH="/opt/pacman/lib" \
+        -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+        -DBUILD_SHARED_LIBS=ON \
+        -DEXIV2_ENABLE_INIH=OFF \
+        -DEXIV2_ENABLE_BROTLI=OFF \
+        -DEXIV2_ENABLE_NLS=OFF \
+        -DEXIV2_BUILD_SAMPLES=OFF \
+        -DEXIV2_BUILD_UNIT_TESTS=OFF \
+        -DEXIV2_BUILD_DOC=OFF
+
+    cmake --build build
+}
+
+package() {
+    DESTDIR="${pkgdir}" cmake --install build
+
+    install -dm755 "${pkgdir}/opt/pacman/share/licenses/${pkgname}"
+    cp -a "${pkgname}-${pkgver}/COPYING" "${pkgdir}/opt/pacman/share/licenses/${pkgname}/"
+
+    find "${pkgdir}/opt/pacman" -type f -print0 | while IFS= read -r -d '' f; do
+        if file -b "$f" | grep -qE "Mach-O.*(executable|dynamically linked shared library|bundle)"; then
+            codesign --sign - --force "$f" 2>/dev/null || true
+        fi
+    done
+}
+

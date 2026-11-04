@@ -1,0 +1,16 @@
+# Build products and temporary files
+build/
+staging/
+logs/
+sources/
+out/darwin_x86_64/
+out/darwin_arm64/
+out/*.pkg.tar.*
+tests/**/build/
+.vscode/
+*.pkg.tar.zst
+*.pkg.tar.xz
+*.pkg.tar.gz
+*.sig
+.DS_Store
+

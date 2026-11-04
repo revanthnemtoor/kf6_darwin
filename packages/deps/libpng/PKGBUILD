@@ -1,0 +1,55 @@
+# Maintainer: kf6_darwin Maintainers <maintainers@kf6-darwin.local>
+# Upstream: https://github.com/pnggroup/libpng
+
+pkgname=libpng
+pkgver=1.6.59
+pkgrel=1
+pkgdesc='A collection of routines used to create PNG format graphics files'
+arch=('darwin_x86_64' 'darwin_arm64')
+url='http://www.libpng.org/pub/png/libpng.html'
+license=('Libpng')
+depends=('zlib')
+makedepends=()
+_commit='cd952f49f95bb27154ae77dbb103032d95f6e580'
+source=("https://github.com/pnggroup/libpng/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=('2540302a1844ad2b2b501977abecfa850f265f97b78f065a712ab4074a89f5b5')
+sha512sums=('2d753e764846a0a75a10f2a00c6f4ae23d2ae37237c69d59d5e619da3f143d59f4ea9ce29c1fb39435df1cef77877c83b042a2275934c353a6603061da2d2dd9')
+
+build() {
+    export LC_ALL=en_US.UTF-8
+    export PATH="/opt/pacman/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/local/bin:/usr/local/bin"
+
+    local target_arch="${CARCH#darwin_}"
+    [[ -z "${target_arch}" || "${target_arch}" == "${CARCH}" ]] && target_arch="$(uname -m)"
+
+    cmake -B build -S "${pkgname}-${pkgver}" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="/opt/pacman" \
+        -DCMAKE_INSTALL_NAME_DIR="/opt/pacman/lib" \
+        -DCMAKE_IGNORE_PREFIX_PATH="/opt/local;/usr/local;/opt/homebrew" \
+        -DCMAKE_PREFIX_PATH="/opt/pacman" \
+        -DCMAKE_OSX_ARCHITECTURES="${target_arch}" \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET="15.0" \
+        -DCMAKE_INSTALL_RPATH="/opt/pacman/lib" \
+        -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+        -DPNG_SHARED=ON \
+        -DPNG_STATIC=OFF \
+        -DPNG_FRAMEWORK=OFF \
+        -DPNG_TESTS=OFF
+
+    cmake --build build
+}
+
+package() {
+    DESTDIR="${pkgdir}" cmake --install build
+
+    install -dm755 "${pkgdir}/opt/pacman/share/licenses/${pkgname}"
+    cp -a "${pkgname}-${pkgver}/LICENSE" "${pkgdir}/opt/pacman/share/licenses/${pkgname}/"
+
+    find "${pkgdir}/opt/pacman" -type f -print0 | while IFS= read -r -d '' f; do
+        if file -b "$f" | grep -qE "Mach-O.*(executable|dynamically linked shared library|bundle)"; then
+            codesign --sign - --force "$f" 2>/dev/null || true
+        fi
+    done
+}
+

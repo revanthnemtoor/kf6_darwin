@@ -1,0 +1,57 @@
+# Maintainer: Revanth Reddy Nemtoor <revanthreddyn123@gmail.com>
+pkgname=sonnet
+pkgver=6.31.0
+pkgrel=1
+pkgdesc="Spelling framework for Qt 6 (KDE Frameworks 6 for Darwin with native NSSpellChecker)"
+arch=('darwin_x86_64' 'darwin_arm64')
+url="https://invent.kde.org/frameworks/sonnet"
+license=('LGPL-2.0-or-later' 'LGPL-2.1-or-later')
+depends=('qt6-base' 'qt6-declarative')
+makedepends=('extra-cmake-modules' 'qt6-tools' 'cmake' 'ninja')
+options=('!strip')
+_commit="faff0a83f637b74e900d82252aab8fccf99ae0d7" # refs/tags/v6.31.0^{}
+source=("https://download.kde.org/stable/frameworks/${pkgver%.*}/${pkgname}-${pkgver}.tar.xz")
+sha256sums=('8a0db04df7c8d9d386dddc2e5d94f1504b15c63b3dc091a4eeb2519788b5aec6')
+sha512sums=('7e7183f7a2ec88395681c6b29dbb74beedeebc70426ace3c1dc464d9be74e23b4455f31d09a9fdc2fc4730275b23b9e5f59f650d6cb28cfd9420a7d99ea96b48')
+
+build() {
+  local _arch
+  case "${CARCH:-$(uname -m)}" in
+    x86_64|darwin_x86_64) _arch="x86_64" ;;
+    arm64|darwin_arm64)   _arch="arm64" ;;
+    *)                    _arch="$(uname -m)" ;;
+  esac
+
+  export LC_ALL=en_US.UTF-8
+  export PKG_CONFIG_LIBDIR="/opt/pacman/lib/pkgconfig:/opt/pacman/share/pkgconfig"
+  export PKG_CONFIG_PATH="/opt/pacman/lib/pkgconfig:/opt/pacman/share/pkgconfig"
+  export PATH="/opt/pacman/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/local/bin:/usr/local/bin"
+
+  cmake -B build -S "${pkgname}-${pkgver}" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/opt/pacman \
+    -DKDE_INSTALL_BUNDLEDIR=/opt/pacman/Applications/KDE \
+    -DAPPLE_SUPPRESS_X11_WARNING=ON \
+    -DPython3_EXECUTABLE=/usr/bin/python3 \
+    -DCMAKE_OSX_ARCHITECTURES="${_arch}" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+    -DCMAKE_PREFIX_PATH=/opt/pacman \
+    -DCMAKE_IGNORE_PREFIX_PATH="/opt/local;/usr/local;/opt/homebrew" \
+    -DCMAKE_INSTALL_RPATH="/opt/pacman/lib" \
+    -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+    -DBUILD_TESTING=OFF
+
+  cmake --build build --parallel
+}
+
+package() {
+  DESTDIR="${pkgdir}" cmake --install build
+
+  if [[ -d "${pkgname}-${pkgver}/LICENSES" ]]; then
+    install -d "${pkgdir}/opt/pacman/share/licenses/${pkgname}"
+    cp -a "${pkgname}-${pkgver}/LICENSES/"* "${pkgdir}/opt/pacman/share/licenses/${pkgname}/"
+  fi
+
+  find "${pkgdir}" -name ".DS_Store" -delete 2>/dev/null || true
+}
+
